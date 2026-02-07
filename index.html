@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no" />
+  <title>Dog Vision Camera</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+
+    .ui {
+      position: fixed;
+      bottom: 24px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .shutter {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: white;
+      border: 6px solid rgba(0,0,0,0.2);
+      cursor: pointer;
+    }
+
+    .result {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+
+    .result img {
+      max-width: 100%;
+      max-height: 80vh;
+    }
+
+    .buttons {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 12px 18px;
+      background: white;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="ui">
+  <div class="shutter" id="shutter"></div>
+</div>
+
+<div class="result" id="result">
+  <img id="photo" />
+  <div class="buttons">
+    <div class="btn" id="save">저장</div>
+    <div class="btn" id="retry">다시 찍기</div>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const video = document.createElement("video");
+
+  const shutter = document.getElementById("shutter");
+  const result = document.getElementById("result");
+  const photo = document.getElementById("photo");
+  const saveBtn = document.getElementById("save");
+  const retryBtn = document.getElementById("retry");
+
+  function resize() {
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment" },
+    audio: false
+  }).then(stream => {
+    video.srcObject = stream;
+    video.play();
+    requestAnimationFrame(draw);
+  });
+
+  function draw() {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    let data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Dog vision approximation
+      data[i]     = 0.6 * g + 0.4 * b; // R
+      data[i + 1] = 0.7 * g + 0.3 * r; // G
+      data[i + 2] = b;               // B
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    requestAnimationFrame(draw);
+  }
+
+  shutter.onclick = () => {
+    const dataUrl = canvas.toDataURL("image/png");
+    photo.src = dataUrl;
+    result.style.display = "flex";
+  };
+
+  retryBtn.onclick = () => {
+    result.style.display = "none";
+  };
+
+  saveBtn.onclick = () => {
+    const link = document.createElement("a");
+    link.href = photo.src;
+    link.download = "dog-vision.png";
+    link.click();
+  };
+</script>
+
+</body>
+</html>
