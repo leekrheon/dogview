@@ -6,8 +6,13 @@
 <title>Dog Vision Camera</title>
 
 <style>
-  body {
+  * {
     margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
     background: black;
     overflow: hidden;
   }
@@ -44,7 +49,7 @@
 <canvas id="canvas"></canvas>
 
 <div class="ui">
-  <div class="shutter" id="shutter"></div>
+  <div class="shutter"></div>
 </div>
 
 <script>
@@ -76,36 +81,39 @@ function draw() {
   const d = imageData.data;
 
   for (let i = 0; i < d.length; i += 4) {
-    let r = d[i] / 255;
-    let g = d[i+1] / 255;
-    let b = d[i+2] / 255;
+    const r = d[i] / 255;
+    const g = d[i + 1] / 255;
+    const b = d[i + 2] / 255;
 
-    // RGB → LMS (Hunt-Pointer-Estevez)
-    let L = 0.31399022*r + 0.63951294*g + 0.04649755*b;
-    let M = 0.15537241*r + 0.75789446*g + 0.08670142*b;
-    let S = 0.01775239*r + 0.10944209*g + 0.87256922*b;
+    // 1. 인간 기준 밝기 (초록 포함하지만 '색' 아님)
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
 
-    // Dog vision: L cone 제거
-    L = 0;
+    // 2. 개 시각 색 구성
+    // - R,G : 밝기 정보만
+    // - B   : 유일한 색감 채널
+    let dogR = luminance;
+    let dogG = luminance;
+    let dogB = b;
 
-    // LMS → RGB
-    let rr =  5.47221206*L - 4.6419601*M + 0.16963708*S;
-    let gg = -1.1252419*L + 2.29317094*M - 0.1678952*S;
-    let bb =  0.02980165*L - 0.19318073*M + 1.16364789*S;
+    // 3. 노랑 영역 보정 (밝지만 색은 약하게)
+    if (r > 0.6 && g > 0.6 && b < 0.4) {
+      dogR = luminance * 1.05;
+      dogG = luminance * 1.05;
+      dogB = luminance * 0.85;
+    }
 
-    // 채도 감소 + 명암 유지
-    rr = Math.min(Math.max(rr, 0), 1);
-    gg = Math.min(Math.max(gg, 0), 1);
-    bb = Math.min(Math.max(bb, 0), 1);
+    // 4. 파랑 과포화 방지
+    dogB = dogB * 0.9 + luminance * 0.1;
 
-    const gray = (rr + gg + bb) / 3;
-    rr = rr * 0.75 + gray * 0.25;
-    gg = gg * 0.75 + gray * 0.25;
-    bb = bb * 0.75 + gray * 0.25;
+    // 5. 전체 채도 감소 (개 시각 특성)
+    const gray = (dogR + dogG + dogB) / 3;
+    dogR = dogR * 0.65 + gray * 0.35;
+    dogG = dogG * 0.65 + gray * 0.35;
+    dogB = dogB * 0.65 + gray * 0.35;
 
-    d[i]   = rr * 255;
-    d[i+1] = gg * 255;
-    d[i+2] = bb * 255;
+    d[i]     = Math.min(255, Math.max(0, dogR * 255));
+    d[i + 1] = Math.min(255, Math.max(0, dogG * 255));
+    d[i + 2] = Math.min(255, Math.max(0, dogB * 255));
   }
 
   ctx.putImageData(imageData, 0, 0);
